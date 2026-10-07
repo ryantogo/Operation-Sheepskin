@@ -14,7 +14,7 @@ They have spent their money the way small states always do: second-hand, through
 
 London answers the way it did in 1969: frigates, paratroopers and the Metropolitan Police. The plan is the same. The reception is not.
 
-*Player: United Kingdom. Recommended: play the full twelve hours; most games are decided within six.*
+*Single player: choose the United Kingdom. Real-time multiplayer (CMO v1.10): co-op with both players on the United Kingdom against the AI, or head-to-head with one player per side. Recommended: play the full twelve hours; most games are decided within six.*
 
 ---
 
@@ -76,7 +76,7 @@ London answers the way it did in 1969: frigates, paratroopers and the Metropolit
 
 ---
 
-## Scoring thresholds (Editor: Scenario > Scoring)
+## United Kingdom scoring thresholds (Editor: Scenario > Scoring)
 
 | Level | Score at or above |
 |---|---|
@@ -87,6 +87,41 @@ London answers the way it did in 1969: frigates, paratroopers and the Metropolit
 | Minor Defeat | -20 |
 | Major Defeat | -120 |
 | Disaster | below -120 |
+
+---
+
+## Paste: Anguilla Briefing (head-to-head multiplayer only)
+
+**SITUATION.** At 0500 local a British amphibious task group is off Road Bay: a Type 23, a Type 45, RFA Mounts Bay and a patrol ship. Typhoons are at Antigua, 95 nm south-east.
+
+**YOUR FORCES.**
+- Air (Wallblake): two Kfir C.12, two Pampas, one Wing Loong II, one Hermes 450.
+- Sea: ANS *Sombrero* (Type 148, Exocet) at Island Harbour; ANS *Dog Island* and ANS *Scrub Island* (Daburs) in Crocus Bay.
+- Coast: the Exocet battery at Stoney Ground and its radar on Crocus Hill.
+- Air defence: Mistrals at Wallblake, FN-6s on South Hill, a ZU-23 technical.
+- Ground: militia at Sandy Ground, Wallblake and The Quarter; the volunteer cadre and mortar platoon; heavy machine guns and technicals.
+
+**PRE-BUILT MISSIONS.** *Kfir CAP* and *Hermes Watch* are active. *Wing Loong Hunt*, *Pampa Strike* and *Naval Sortie* are inactive; activate them when you choose.
+
+**RULES.** The British are on Weapons Hold until you open fire, so your first shot is free. If they shoot first, you score.
+
+**SCORING.** You score for every British loss (the same values the British lose), +15 for each British ship hit, +20 each time the British destroy one of your units before you have fired, and +5 for each objective you still hold at every full hour. You lose points for each objective the British secure and for each unit you lose. Civilian losses cost both sides 20 points, whoever caused them.
+
+---
+
+## Anguilla scoring thresholds (head-to-head only)
+
+| Level | Score at or above |
+|---|---|
+| Triumph | 150 |
+| Major Victory | 75 |
+| Minor Victory | 0 |
+| Average | -100 |
+| Minor Defeat | -200 |
+| Major Defeat | -300 |
+| Disaster | below -300 |
+
+These are starting points; tune them after the first few head-to-head games.
 
 ---
 
@@ -154,7 +189,15 @@ London answers the way it did in 1969: frigates, paratroopers and the Metropolit
 
 Balance is kept in moderation: two fighters, two light attack aircraft, two drones, three boats and one coastal battery against two escorts, a patrol ship and four Typhoons. The British should win; the Exocet battery and the boats decide how much it costs.
 
-## AI timeline
+## Real-time multiplayer notes
+
+- **Co-op:** both players take the United Kingdom; Anguilla stays on the AI with its scripted timeline and the withdrawal at The Quarter. Routine news (troops ashore, waves embarked, notable kills) appears as short map notifications instead of pop-ups, so one player's pop-up does not interrupt the other. Critical news (ROE change, objectives, losses, the end) is still a pop-up.
+- **Head-to-head:** one player per side. The scripted AI timeline and the withdrawal are switched off for a human Anguilla; the pre-built missions are left for that player. All news is side-addressed so neither player sees the other's messages.
+- **Detection:** the scripts ask the game whether the session is multiplayer and whether Anguilla is human; the first British pop-up shows the result. On builds older than v1.10 they fall back to single-player behaviour.
+- **Script load:** one timer event every 15 to 30 seconds, plus events that fire only when something is destroyed, a ship is hit, or the first hostile launch is seen. Ground-unit and aircraft hits, and launch detection, each fire once.
+- See [`docs/rtmp-test-plan.md`](../../docs/rtmp-test-plan.md) for what to verify in a live session.
+
+## AI timeline (single player and co-op)
 
 | Time | Event |
 |---|---|

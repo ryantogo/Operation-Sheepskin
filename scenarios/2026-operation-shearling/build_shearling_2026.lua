@@ -16,6 +16,10 @@
   Player   : United Kingdom.  AI: Anguilla (Anguillian Defence Force, its
              second-hand air arm and navy, and a foreign volunteer cadre).
              Neutral: Anguillian Civilians.
+  Multiplayer: built for CMO v1.10 real-time multiplayer.  Single player and
+             co-op: United Kingdom vs the Anguillan AI.  Head-to-head: one
+             player per side; the scripted AI timeline switches off for a
+             human Anguilla.  See docs/rtmp-test-plan.md.
 
   Every DBID was taken from the DB3000 listing at cmano-db.com (db v.511).
   Loadout IDs are not published there, so aircraft are added with the IDs in
@@ -240,7 +244,9 @@ for _, s in ipairs({ UK, AI }) do
   ScenEdit_SetSidePosture(s, CIV, 'N')
   ScenEdit_SetSidePosture(CIV, s, 'N')
 end
-pcall(ScenEdit_SetSideOptions, { side = AI,  awareness = 'Normal', proficiency = 'Regular', computerControlledOnly = true })
+-- Anguilla is playable so the scenario supports head-to-head real-time
+-- multiplayer.  In single player, choose the United Kingdom.
+pcall(ScenEdit_SetSideOptions, { side = AI,  awareness = 'Normal', proficiency = 'Regular', computerControlledOnly = false })
 pcall(ScenEdit_SetSideOptions, { side = CIV, awareness = 'Normal', proficiency = 'Novice',  computerControlledOnly = true })
 pcall(ScenEdit_SetSideOptions, { side = UK,  awareness = 'Normal', proficiency = 'Regular' })
 
@@ -369,6 +375,13 @@ local RT = {
           'marker, or when a Merlin reaches the LZ below 350 m. Empty craft that return to Mounts Bay embark the ' ..
           'next wave.<br/><i>Rules of engagement: do not fire first. The task group is on Weapons Hold ' ..
           '(self-defence only) until the Anguillans open fire.</i>',
+  intro_ai = '<b>ANGUILLA, 0500 local, 19 March 2026.</b><br/>A British amphibious task group is off Road Bay. ' ..
+             'You command the Anguillan Defence Force, its air arm and navy, the Exocet battery and the volunteer ' ..
+             'cadre.<br/>Pre-built missions: <b>Kfir CAP</b> and <b>Hermes Watch</b> are active; <b>Wing Loong Hunt</b>, ' ..
+             '<b>Pampa Strike</b> and <b>Naval Sortie</b> are waiting for you to activate them. You score for every ' ..
+             'British loss, for each objective you still hold at every full hour, and if the British fire first. You ' ..
+             'lose points for each objective lost and each unit lost; civilian losses cost both sides.<br/>' ..
+             '<i>The British are on Weapons Hold until you open fire.</i>',
   dest = {
     ['Sandy Ground']  = { lat = 18.1996, lon = -63.0905, r = 600, land_lat = 18.2001, land_lon = -63.0893 },
     ['LZ Wallblake']  = { lat = 18.2045, lon = -63.0610, r = 800, land_lat = 18.2045, land_lon = -63.0612,
@@ -459,6 +472,8 @@ local RT = {
   loss_type = { Aircraft = 15, Ship = 20, Facility = 10 },
   ship_hit = 15,
   roe_violation = 20,
+  hold_pts = 5,                -- Anguilla scores this per objective still held, every full hour
+  routine_as_barks = true,     -- multiplayer co-op: routine news as map barks instead of pop-ups
   civ_pts = 20,
 }
 
@@ -468,13 +483,49 @@ local RT = {
 local LIB = [==[
 local function kv(k) local v = ScenEdit_GetKeyValue(RT.prefix .. k) if v == nil or v == '' then return nil end return v end
 local function setkv(k, v) ScenEdit_SetKeyValue(RT.prefix .. k, tostring(v)) end
-local function msg(html) pcall(ScenEdit_SpecialMessage, RT.uk, html) end
-local function score(n, why)
-  if not n or n == 0 then return end
-  local s = ScenEdit_GetScore(RT.uk) or 0
-  ScenEdit_SetScore(RT.uk, s + n, why)
-end
 local function num(x) return tonumber(x) or 0 end
+
+-- Session detection (CMO v1.10+).  Older builds lack these calls, so every
+-- probe is wrapped and falls back to single-player behaviour.
+local function isRTMP()
+  local ok, r = pcall(ScenEdit_GetGameIsRTMP)
+  return ok and r == true
+end
+local function isHuman(side)
+  local ok, r = pcall(ScenEdit_GetSideIsPlayer, side)
+  if ok and r ~= nil then return r == true end
+  ok, r = pcall(ScenEdit_GetSideIsHuman, side)
+  return ok and r == true
+end
+local OPFOR_HUMAN = isHuman(RT.opfor)
+local RTMP = isRTMP()
+
+-- Messages.  Critical news is always a side-addressed special message.
+-- Routine news in a multiplayer co-op session becomes a map "bark" at the
+-- spot it concerns, so pop-ups do not interrupt the other player.  Barks are
+-- not side-addressed, so in head-to-head play routine news stays a special
+-- message to avoid showing British positions to the Anguillan player.
+local function plain(html) return (html:gsub('<br/>', ' '):gsub('<[^>]+>', '')) end
+local function msg(html) pcall(ScenEdit_SpecialMessage, RT.uk, html) end
+local function msgAI(html) if OPFOR_HUMAN then pcall(ScenEdit_SpecialMessage, RT.opfor, html) end end
+local function note(html, lat, lon)
+  if RTMP and RT.routine_as_barks and not OPFOR_HUMAN and lat and lon then
+    local ok = pcall(ScenEdit_CreateBarkNotification_Geo, lon, lat, plain(html), 255, 215, 0, true, true, 12, 16)
+    if ok then return end
+  end
+  msg(html)
+end
+
+-- Scores.  The UK score is the player's; the Anguillan score mirrors it so
+-- head-to-head games have a winner on both sides.
+local function addTo(side, n, why)
+  if not n or n == 0 then return end
+  local s = ScenEdit_GetScore(side) or 0
+  ScenEdit_SetScore(side, s + n, why)
+end
+local function score(n, why) addTo(RT.uk, n, why) end
+local function scoreAI(n, why) addTo(RT.opfor, n, why) end
+
 local function getu(side, name)
   local ok, u = pcall(ScenEdit_GetUnit, { side = side, unitname = name })
   if ok and u then return u end
@@ -492,17 +543,27 @@ local function dist(a1, o1, a2, o2)
   return 2 * 6371000 * math.asin(math.min(1, math.sqrt(h)))
 end
 local function near(u, lat, lon, r) return u and dist(num(u.latitude), num(u.longitude), lat, lon) <= r end
-local function ukGroundNear(lat, lon, r)
+
+-- British ground positions are read once per script run and reused by every
+-- objective check, which keeps the heartbeat light.
+local UKG = nil
+local function ukGround()
+  if UKG then return UKG end
+  UKG = {}
   local ok, s = pcall(VP_GetSide, { side = RT.uk })
-  if not (ok and s) then return 0 end
+  if not (ok and s) then return UKG end
   local list = nil
   pcall(function() list = s:unitsBy('Facility') end)
   if not list or next(list) == nil then list = s.units end
-  local n = 0
   for _, e in pairs(list or {}) do
     local u = getg(e.guid)
-    if u and not RT.not_ground[u.type] and near(u, lat, lon, r) then n = n + 1 end
+    if u and not RT.not_ground[u.type] then UKG[#UKG + 1] = { num(u.latitude), num(u.longitude) } end
   end
+  return UKG
+end
+local function ukGroundNear(lat, lon, r)
+  local n = 0
+  for _, p in ipairs(ukGround()) do if dist(p[1], p[2], lat, lon) <= r then n = n + 1 end end
   return n
 end
 local function defenderNear(lat, lon, r)
@@ -517,21 +578,32 @@ local function releaseROE(reason)
   pcall(ScenEdit_SetDoctrine, { side = RT.uk }, { weapon_control_status_air = 1, weapon_control_status_surface = 1,
                                                  weapon_control_status_land = 1 })
   msg(RT.roe_msg .. '<br/><i>' .. reason .. '</i>')
+  msgAI('<b>The British are now free to return fire.</b>')
 end
 ]==]
 
 local HEARTBEAT = [==[
 local now = ScenEdit_CurrentTime()
 local t0 = tonumber(kv('t0') or '')
-if not t0 then t0 = now; setkv('t0', now); msg(RT.intro) end
+if not t0 then
+  t0 = now
+  setkv('t0', now)
+  setkv('session', (RTMP and 'RTMP' or 'single') .. (OPFOR_HUMAN and '/pvp' or '/vs-ai'))
+  msg(RT.intro .. '<br/><br/><small>Session: ' .. (RTMP and 'real-time multiplayer' or 'single player') ..
+      '; Anguilla is ' .. (OPFOR_HUMAN and 'human-controlled' or 'AI-controlled') .. '.</small>')
+  msgAI(RT.intro_ai)
+end
 local T = (now - t0) / 60
 
--- 1. Timed AI activations.
-for i, st in ipairs(RT.stages) do
-  if T >= st.at and not kv('stage' .. i) then
-    setkv('stage' .. i, 1)
-    if st.mission then pcall(ScenEdit_SetMission, RT.opfor, st.mission, { isactive = true }) end
-    if st.msg then msg(st.msg) end
+-- 1. Timed AI activations.  A human Anguillan commander runs their own
+--    missions instead; the pre-built ones are left for them to activate.
+if not OPFOR_HUMAN then
+  for i, st in ipairs(RT.stages) do
+    if T >= st.at and not kv('stage' .. i) then
+      setkv('stage' .. i, 1)
+      if st.mission then pcall(ScenEdit_SetMission, RT.opfor, st.mission, { isactive = true }) end
+      if st.msg then msg(st.msg) end
+    end
   end
 end
 
@@ -557,19 +629,23 @@ for cname, c in pairs(RT.craft) do
           if sp.pts then score(sp.pts, uname .. ' ashore') end
         end
         setkv('cs_' .. cname, 'empty')
-        msg('<b>' .. cname .. '</b>: ' .. table.concat(load, ', ') .. ' ashore at ' .. c.dest .. '.' ..
-            (load.msg and ('<br/>' .. load.msg) or ''))
+        if load.msg then msg(load.msg) end
+        note('<b>' .. cname .. '</b>: ' .. table.concat(load, ', ') .. ' ashore at ' .. c.dest .. '.', d.lat, d.lon)
       end
     elseif st == 'empty' and w < #c.loads then
       local m = getu(RT.uk, c.mother)
       if m and near(u, num(m.latitude), num(m.longitude), RT.reload_r) then
         local nxt = c.loads[w + 1]
         if nxt.requires and not kv(nxt.requires) then
-          if not kv('wait_' .. cname) then setkv('wait_' .. cname, 1); msg(nxt.wait_msg or 'Next wave is not ready.') end
+          if not kv('wait_' .. cname) then
+            setkv('wait_' .. cname, 1)
+            note(nxt.wait_msg or 'Next wave is not ready.', num(m.latitude), num(m.longitude))
+          end
         else
           setkv('cw_' .. cname, w + 1)
           setkv('cs_' .. cname, 'loaded')
-          msg('<b>' .. cname .. '</b> has embarked ' .. table.concat(nxt, ', ') .. ' from ' .. c.mother .. '.')
+          note('<b>' .. cname .. '</b> has embarked ' .. table.concat(nxt, ', ') .. ' from ' .. c.mother .. '.',
+               num(m.latitude), num(m.longitude))
         end
       end
     end
@@ -577,17 +653,27 @@ for cname, c in pairs(RT.craft) do
 end
 
 -- 4. Objectives: a UK ground unit inside and no listed defender left inside.
+--    Every full hour, each objective still in Anguillan hands scores for Anguilla.
 for _, o in ipairs(RT.objectives) do
   if not kv(o.key) and ukGroundNear(o.lat, o.lon, o.r) >= 1 and not defenderNear(o.lat, o.lon, o.r) then
     setkv(o.key, 1)
     score(o.pts, o.name .. ' secured')
+    scoreAI(-o.pts, o.name .. ' lost')
     msg('<b>' .. o.name .. ' secured.</b> ' .. o.msg)
+    msgAI('<b>' .. o.name .. ' has fallen to the British.</b>')
+  end
+end
+local hour = math.floor(T / 60)
+if hour > num(kv('hour')) then
+  setkv('hour', hour)
+  for _, o in ipairs(RT.objectives) do
+    if not kv(o.key) then scoreAI(RT.hold_pts, o.name .. ' still held at H+' .. hour) end
   end
 end
 
--- 5. Scripted withdrawal from the strongest position.
+-- 5. Scripted withdrawal from the strongest position (AI defenders only).
 local W = RT.withdraw
-if W and not kv('wd') then
+if W and not OPFOR_HUMAN and not kv('wd') then
   local go = true
   for _, n in ipairs(W.needs_dead) do if getu(RT.opfor, n) then go = false end end
   if go and ukGroundNear(W.lat, W.lon, W.r) >= W.min_uk then
@@ -621,7 +707,9 @@ if kv('obj_valley') and not kv('end_t') then
     if not kv('end_t') and near(getu(RT.uk, n), RT.valley.lat, RT.valley.lon, RT.valley.r) then
       setkv('end_t', now)
       score(RT.end_pts, 'Civil authority restored in The Valley')
+      scoreAI(-RT.end_pts, 'British police in The Valley')
       msg(RT.end_msg)
+      msgAI('<b>The Metropolitan Police are in The Valley.</b> The scenario ends in ten minutes.')
     end
   end
 elseif kv('end_t') and now - num(kv('end_t')) >= 600 then
@@ -634,24 +722,32 @@ local u = ScenEdit_UnitX()
 if u then
   if not kv('roe') then
     score(-RT.roe_violation, 'ROE violation: ' .. u.name .. ' destroyed before the defenders opened fire')
+    scoreAI(RT.roe_violation, 'British fired first: ' .. u.name)
   end
   local v = RT.kill[u.name]
   if v == nil then v = RT.kill_type[u.type] or 0 end
   if v > 0 then score(v, 'Destroyed ' .. u.name)
   elseif v < 0 then score(v, 'Political cost: ' .. u.name .. ' killed') end
-  if RT.kill_msg[u.name] then msg(RT.kill_msg[u.name]) end
+  scoreAI(-math.abs(v), 'Lost ' .. u.name)
+  if RT.kill_msg[u.name] then note(RT.kill_msg[u.name], num(u.latitude), num(u.longitude)) end
 end
 ]==]
 
 local UK_LOST = [==[
 local u = ScenEdit_UnitX()
 if u then
-  score(-(RT.loss[u.name] or RT.loss_type[u.type] or 0), 'Lost ' .. u.name)
+  local v = RT.loss[u.name] or RT.loss_type[u.type] or 0
+  score(-v, 'Lost ' .. u.name)
+  scoreAI(v, 'British lost ' .. u.name)
   local c = RT.craft[u.name]
   if c then
     if (kv('cs_' .. u.name) or 'loaded') == 'loaded' then
       local load = c.loads[tonumber(kv('cw_' .. u.name) or '1')]
-      for _, n in ipairs(load) do score(-(RT.loss[n] or 25), n .. ' lost aboard ' .. u.name) end
+      for _, n in ipairs(load) do
+        local lv = RT.loss[n] or 25
+        score(-lv, n .. ' lost aboard ' .. u.name)
+        scoreAI(lv, 'British lost ' .. n .. ' aboard ' .. u.name)
+      end
       msg('<b>' .. u.name .. '</b> has been lost with ' .. table.concat(load, ', ') .. ' embarked.')
     end
     setkv('cs_' .. u.name, 'lost')
@@ -665,6 +761,7 @@ releaseROE('British units are under fire' .. (u and (': ' .. u.name) or '') .. '
 if u and u.type == 'Ship' and not kv('hit_' .. u.name) then
   setkv('hit_' .. u.name, 1)
   score(-RT.ship_hit, u.name .. ' hit')
+  scoreAI(RT.ship_hit, 'Hit ' .. u.name)
 end
 ]==]
 
@@ -675,8 +772,11 @@ releaseROE('Hostile weapon launch detected.')
 local CIV_LOST = [==[
 local u = ScenEdit_UnitX()
 if u then
+  -- Either side can cause it, so both pay; nobody gains from shelling a church.
   score(-RT.civ_pts, 'Collateral damage: ' .. u.name)
+  scoreAI(-RT.civ_pts, 'Civilian loss: ' .. u.name)
   msg('<b>Collateral damage.</b> ' .. u.name .. ' has been destroyed. Expect questions in the House.')
+  msgAI('<b>Civilian loss.</b> ' .. u.name .. ' has been destroyed.')
 end
 ]==]
 
@@ -694,13 +794,24 @@ for code, kind in pairs({ [1] = 'Aircraft', [2] = 'Ship', [4] = 'Facility' }) do
   luaEvent('OSH UK loses ' .. kind,
            { type = 'UnitDestroyed', TargetFilter = { TargetSide = UK, TargetType = code } },
            HEAD .. UK_LOST, true)
+end
+-- Damage events.  Only ship hits score, so only the ship event repeats; the
+-- aircraft and ground events exist to release the ROE and fire once.  Under
+-- sustained fire this keeps the event engine from re-running scripts on every
+-- hit, which matters in multiplayer.
+luaEvent('OSH UK ship hit',
+         { type = 'UnitDamaged', DamagePercent = 1, TargetFilter = { TargetSide = UK, TargetType = 2 } },
+         HEAD .. UK_HIT, true)
+for code, kind in pairs({ [1] = 'Aircraft', [4] = 'Facility' }) do
   luaEvent('OSH UK hit ' .. kind,
            { type = 'UnitDamaged', DamagePercent = 1, TargetFilter = { TargetSide = UK, TargetType = code } },
-           HEAD .. UK_HIT, true)
+           HEAD .. UK_HIT, false)
 end
+-- One launch is enough to release the ROE, so this fires once; a repeating
+-- version would run on every missile, shell and drone detection.
 luaEvent('OSH Hostile weapon detected',
          { type = 'UnitDetected', DetectorSideID = UK, MCL = 0, TargetFilter = { TargetSide = AI, TargetType = 6 } },
-         HEAD .. HOSTILE_FIRE, true)
+         HEAD .. HOSTILE_FIRE, false)
 for code, kind in pairs({ [2] = 'Ship', [4] = 'Facility' }) do
   luaEvent('OSH Civilian ' .. kind .. ' lost',
            { type = 'UnitDestroyed', TargetFilter = { TargetSide = CIV, TargetType = code } },

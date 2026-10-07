@@ -62,7 +62,14 @@ function ScenEdit_SetSidePosture(a, b, p)
   M.sides[a].posture[b] = p
   return true
 end
-function ScenEdit_SetSideOptions(t) assert(M.sides[get(t, 'side')], 'options on unknown side') return {} end
+M.sideOptions = {}
+function ScenEdit_SetSideOptions(t)
+  local side = get(t, 'side')
+  assert(M.sides[side], 'options on unknown side')
+  M.sideOptions[side] = M.sideOptions[side] or {}
+  for k, v in pairs(t) do M.sideOptions[side][lower(k)] = v end
+  return {}
+end
 function ScenEdit_SetDoctrine(sel, d)
   local s = get(sel, 'side')
   assert(M.sides[s], 'doctrine on unknown side')
@@ -210,11 +217,22 @@ end
 function ScenEdit_SpecialMessage(side, html) M.messages[#M.messages + 1] = '[' .. side .. '] ' .. html return 1 end
 function ScenEdit_GetScore(side) return M.score[side] end
 function ScenEdit_SetScore(side, s, why)
-  M.scorelog[#M.scorelog + 1] = string.format('%+5d  %s', s - M.score[side], why)
+  M.scorelog[#M.scorelog + 1] = string.format('%-15s %+5d  %s', side, s - M.score[side], why)
   M.score[side] = s
   return s
 end
 function ScenEdit_CurrentTime() return M.now end
+-- v1.10 real-time multiplayer probes; a test sets M.rtmp and M.humans.
+M.rtmp, M.humans, M.barks = false, {}, {}
+function ScenEdit_GetGameIsRTMP() return M.rtmp end
+function ScenEdit_GetSideIsPlayer(side) assert(M.sides[side], 'unknown side') return M.humans[side] == true end
+function ScenEdit_GetSideIsHuman(side) assert(M.sides[side], 'unknown side') return M.humans[side] == true end
+function ScenEdit_CreateBarkNotification_Geo(lon, lat, text, r, g, b)
+  assert(type(lon) == 'number' and type(lat) == 'number' and type(text) == 'string', 'bad bark')
+  assert(not text:match('<'), 'bark text must be plain')
+  M.barks[#M.barks + 1] = text
+  return true
+end
 function ScenEdit_EndScenario() M.ended = true end
 function ScenEdit_UnitX() return wrap(M.unitx) end
 

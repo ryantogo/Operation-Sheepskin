@@ -14,7 +14,7 @@ This scenario diverges at a single point. Although the historical Anguillian Def
 
 The British plan stays exactly as written. Only the reception changes.
 
-*Player: United Kingdom. Recommended: play the full twelve hours; most games are decided within six.*
+*Single player: choose the United Kingdom. Real-time multiplayer (CMO v1.10): co-op with both players on the United Kingdom against the AI, or head-to-head with one player per side. Recommended: play the full twelve hours; most games are decided within six.*
 
 ---
 
@@ -67,7 +67,7 @@ The British plan stays exactly as written. Only the reception changes.
 
 ---
 
-## Scoring thresholds (Editor: Scenario > Scoring)
+## United Kingdom scoring thresholds (Editor: Scenario > Scoring)
 
 | Level | Score at or above |
 |---|---|
@@ -80,6 +80,40 @@ The British plan stays exactly as written. Only the reception changes.
 | Disaster | below -80 |
 
 A clean run that follows the narrative (withdrawal at The Quarter, no civilian damage, light casualties) lands around 140 to 160.
+
+---
+
+## Paste: Anguilla Briefing (head-to-head multiplayer only)
+
+**SITUATION.** At 0500 local two British frigates and a landing ship are at anchor in Road Bay. Landing craft are forming up off Sandy Ground and helicopters are warming up on the frigates' decks. London expects a walkover.
+
+**YOUR FORCES.**
+- Sandy Ground: a DShK on the ridge, a militia platoon in the village, the 82mm mortar on the reverse slope.
+- Wallblake: a DShK covering the strip, a roadblock technical, a militia platoon, and the Cuban T-28 Trojan.
+- The Quarter: the Cuban volunteer platoon, a militia platoon and the Valley road technical.
+- Crocus Bay: the torpedo boat *Libertad*.
+
+**PRE-BUILT MISSIONS.** *T-28 Harassment* and *Torpedo Run* (anti-shipping patrols over Road Bay) are inactive; activate them when you choose.
+
+**RULES.** The British are on Weapons Hold until you open fire. Make them land first if you can; if they shoot first, you score.
+
+**SCORING.** You score for every British loss (the same values the British lose), +15 for each British ship hit, +20 each time the British destroy one of your units before you have fired, and +5 for each objective you still hold at every full hour. You lose points for each objective the British secure and for each unit you lose. Civilian losses cost both sides 20 points, whoever caused them.
+
+---
+
+## Anguilla scoring thresholds (head-to-head only)
+
+| Level | Score at or above |
+|---|---|
+| Triumph | 100 |
+| Major Victory | 50 |
+| Minor Victory | 0 |
+| Average | -60 |
+| Minor Defeat | -120 |
+| Major Defeat | -180 |
+| Disaster | below -180 |
+
+These are starting points; tune them after the first few head-to-head games.
 
 ---
 
@@ -128,7 +162,15 @@ The narrative is a walkover with casualties. To give the naval and air game some
 
 Everything else (two frigates, two Wasps, a rifle company in three platoons plus reserve, the police, two DShKs, the mortar, the two technicals, the Cuban cadre at The Quarter) follows the narrative.
 
-## AI timeline
+## Real-time multiplayer notes
+
+- **Co-op:** both players take the United Kingdom; Anguilla stays on the AI with its scripted timeline and the withdrawal at The Quarter. Routine news (troops ashore, waves embarked, notable kills) appears as short map notifications instead of pop-ups, so one player's pop-up does not interrupt the other. Critical news (ROE change, objectives, losses, the end) is still a pop-up.
+- **Head-to-head:** one player per side. The scripted AI timeline and the withdrawal are switched off for a human Anguilla; the pre-built missions are left for that player. All news is side-addressed so neither player sees the other's messages.
+- **Detection:** the scripts ask the game whether the session is multiplayer and whether Anguilla is human; the first British pop-up shows the result. On builds older than v1.10 they fall back to single-player behaviour.
+- **Script load:** one timer event every 15 to 30 seconds, plus events that fire only when something is destroyed, a ship is hit, or the first hostile launch is seen. Ground-unit and aircraft hits, and launch detection, each fire once.
+- See [`docs/rtmp-test-plan.md`](../../docs/rtmp-test-plan.md) for what to verify in a live session.
+
+## AI timeline (single player and co-op)
 
 | Time | Event |
 |---|---|
